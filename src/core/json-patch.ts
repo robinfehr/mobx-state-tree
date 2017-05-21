@@ -5,6 +5,7 @@ export type IJsonPatch = {
     op: "replace" | "add" | "remove"
     path: string
     value?: any
+    meta?: Object
 }
 
 /**

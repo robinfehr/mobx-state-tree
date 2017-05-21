@@ -4,15 +4,23 @@ export type ISerializedActionCall = {
     name: string;
     path?: string;
     args?: any[];
+    meta?: Object;
 }
 
 export type IRawActionCall = {
     name: string;
-    object: any & IMSTNode,
-    args: any[]
+    object: any & IMSTNode;
+    args: any[];
 }
 
-export type IMiddleWareHandler = (actionCall: IRawActionCall, next: (actionCall: IRawActionCall) => any) => any
+export type IMiddlewareActionCall = {
+    name: string;
+    object: any & IMSTNode;
+    args: any[];
+    meta?: Object;
+}
+
+export type IMiddleWareHandler = (actionCall: IRawActionCall, next: (actionCall: IMiddlewareActionCall) => any) => any
 
 function runRawAction(actioncall: IRawActionCall): any {
     return actioncall.object[actioncall.name].apply(actioncall.object, actioncall.args)
@@ -29,18 +37,25 @@ function collectMiddlewareHandlers(node: MSTAdministration): IMiddleWareHandler[
     return handlers
 }
 
-function runMiddleWares(node: MSTAdministration, baseCall: IRawActionCall): any {
+function runMiddleWares(node: MSTAdministration, baseCall: IMiddlewareActionCall): any {
     const handlers = collectMiddlewareHandlers(node)
     // Short circuit
     if (!handlers.length)
         return runRawAction(baseCall)
 
-    function runNextMiddleware(call: IRawActionCall): any {
+    function runNextMiddleware(call: IMiddlewareActionCall): any {
         const handler = handlers.shift() // Optimization: counter instead of shift is probably faster
-        if (handler)
+        if (handler) {
             return handler(call, runNextMiddleware)
-        else
-            return runRawAction(call)
+        }
+        else {
+          const rawCall: IRawActionCall = {
+              name: call.name,
+              object: call.object,
+              args: call.args
+          }
+          return runRawAction(rawCall)
+        }
     }
     return runNextMiddleware(baseCall)
 }
@@ -56,11 +71,13 @@ export function createActionInvoker(name: string, fn: Function) {
             return action.apply(this, arguments)
         } else {
             // outer action, run middlewares and start the action!
-            const call: IRawActionCall = {
+            const call: IMiddlewareActionCall = <any>{
                 name,
                 object: adm.target,
-                args: argsToArray(arguments)
+                args: argsToArray(arguments),
             }
+            if ((fn as any).meta) call.meta = (fn as any).meta
+
             const root = adm.root
             root._isRunningAction = true
             try {
@@ -137,11 +154,13 @@ export function applyAction(target: IMSTNode, action: ISerializedActionCall): an
 export function onAction(target: IMSTNode, listener: (call: ISerializedActionCall) => void): IDisposer {
     return addMiddleware(target, (rawCall, next) => {
         const sourceNode = getMSTAdministration(rawCall.object)
-        listener({
+        const call: ISerializedActionCall = {
             name: rawCall.name,
             path: getRelativePathForNodes(getMSTAdministration(target), sourceNode),
-            args: rawCall.args.map((arg: any, index: number) => serializeArgument(sourceNode, rawCall.name, index, arg))
-        })
+            args: rawCall.args.map((arg: any, index: number) => serializeArgument(sourceNode, rawCall.name, index, arg)),
+        }
+        if (rawCall.meta) call.meta = rawCall.meta
+        listener(call)
         return next(rawCall)
     })
 }

@@ -50,7 +50,7 @@ export class MapType<S, T> extends ComplexType<{[key: string]: S}, IExtendedObse
 
     finalizeNewInstance(instance: ObservableMap<any>, snapshot: any) {
         intercept(instance, c => this.willChange(c))
-        observe(instance, this.didChange)
+        observe(instance, this.didChange.bind(null, (this as IType<any, any>).meta))
         getMSTAdministration(instance).applySnapshot(snapshot)
     }
 
@@ -113,21 +113,26 @@ export class MapType<S, T> extends ComplexType<{[key: string]: S}, IExtendedObse
         return res
     }
 
-    didChange(change: IMapChange<any>): void {
+    didChange(meta: Object, change: IMapChange<any>): void {
         const node = getMSTAdministration(change.object)
+        let patch: IJsonPatch
         switch (change.type) {
             case "update":
             case "add":
-                return void node.emitPatch({
+                patch  = {
                     op: change.type === "add" ? "add" : "replace",
                     path: escapeJsonPath(change.name),
                     value: valueToSnapshot(change.newValue)
-                }, node)
+                }
+                if (meta) patch.meta = meta
+                return void node.emitPatch(patch, node)
             case "delete":
-                return void node.emitPatch({
+                patch = {
                     op: "remove",
                     path: escapeJsonPath(change.name)
-                }, node)
+                }
+                if (meta) patch.meta = meta
+                return void node.emitPatch(patch, node)
         }
     }
 
@@ -136,9 +141,11 @@ export class MapType<S, T> extends ComplexType<{[key: string]: S}, IExtendedObse
         switch (patch.op) {
             case "add":
             case "replace":
+                console.log('replace add patch', patch)
                 target.set(subpath, patch.value)
                 break
             case "remove":
+                console.log('remov patch', subpath)
                 target.delete(subpath)
                 break
         }

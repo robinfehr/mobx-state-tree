@@ -2,6 +2,7 @@ import { observable, IObjectWillChange, IObjectChange } from "mobx"
 import { Property } from "./property"
 import { getMSTAdministration, maybeMST, valueToSnapshot, escapeJsonPath } from "../../core"
 import { IType } from "../type"
+import { IJsonPatch } from "../../core/json-patch"
 import { IContext, IValidationResult, getContextForPath } from "../type-checker"
 
 export class ValueProperty extends Property {
@@ -25,11 +26,14 @@ export class ValueProperty extends Property {
 
     didChange(change: IObjectChange) {
         const node = getMSTAdministration(change.object)
-        node.emitPatch({
+        const patch: IJsonPatch = {
             op: "replace",
             path: escapeJsonPath(this.name),
-            value: valueToSnapshot(change.newValue)
-        }, node)
+            value: valueToSnapshot(change.newValue),
+        }
+        if (this.type.meta) patch.meta = this.type.meta
+
+        node.emitPatch(patch, node)
     }
 
     serialize(instance: any, snapshot: any) {

@@ -10,6 +10,7 @@ export interface IType<S, T> {
     Type: T
     SnapshotType: S
     identifierAttribute: string | null
+    meta?: Object
 }
 
 export interface ISimpleType<T> extends IType<T, T> { }

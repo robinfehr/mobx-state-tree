@@ -36,7 +36,7 @@ export class ArrayType<S, T> extends ComplexType<S[], IObservableArray<T>> {
 
     finalizeNewInstance(instance: IObservableArray<any>, snapshot: any) {
         intercept(instance, change => this.willChange(change) as any)
-        observe(instance, this.didChange)
+        observe(instance, this.didChange.bind(null, this.meta))
         getMSTAdministration(instance).applySnapshot(snapshot)
     }
 
@@ -92,27 +92,34 @@ export class ArrayType<S, T> extends ComplexType<S[], IObservableArray<T>> {
         return target.map(valueToSnapshot)
     }
 
-    didChange(this: {}, change: IArrayChange<any> | IArraySplice<any>): void {
+    didChange(meta: Object, change: IArrayChange<any> | IArraySplice<any>): void {
         const node = getMSTAdministration(change.object)
+        let patch: IJsonPatch
         switch (change.type) {
             case "update":
-                return void node.emitPatch({
+                patch = {
                     op: "replace",
                     path: "" + change.index,
                     value: valueToSnapshot(change.newValue)
-                }, node)
+                }
+                if (meta) patch.meta = meta
+                return void node.emitPatch(patch, node)
             case "splice":
                 for (let i = change.index + change.removedCount - 1; i >= change.index; i--)
-                    node.emitPatch({
+                    const patch = {
                         op: "remove",
                         path: "" + i
-                    }, node)
+                    }
+                    if (meta) patch.meta = meta
+                    node.emitPatch(patch, node)
                 for (let i = 0; i < change.addedCount; i++)
-                    node.emitPatch({
+                    patch = {
                         op: "add",
                         path: "" + (change.index + i),
                         value: valueToSnapshot(change.added[i])
-                    }, node)
+                    }
+                    if (meta) patch.meta = meta
+                    node.emitPatch(patch, node)
                 return
         }
     }
