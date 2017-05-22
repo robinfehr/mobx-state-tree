@@ -37,7 +37,7 @@ export class ArrayType<S, T> extends ComplexType<S[], IObservableArray<T>> {
 
     finalizeNewInstance(instance: IObservableArray<any>, snapshot: any) {
         intercept(instance, change => this.willChange(change) as any)
-        observe(instance, this.didChange.bind(null, this.meta))
+        observe(instance, this.didChange.bind(null, (this as IType<any, any>).meta))
         getMSTAdministration(instance).applySnapshot(snapshot)
     }
 
@@ -95,7 +95,10 @@ export class ArrayType<S, T> extends ComplexType<S[], IObservableArray<T>> {
 
     didChange(meta: Object, change: IArrayChange<any> | IArraySplice<any>): void {
         const node = getMSTAdministration(change.object)
-        let patch: IJsonPatch
+        let patch : IJsonPatch = {
+          op: "replace",
+          path: ""
+        }
         switch (change.type) {
             case "update":
                 patch = {
@@ -107,7 +110,7 @@ export class ArrayType<S, T> extends ComplexType<S[], IObservableArray<T>> {
                 return void node.emitPatch(patch, node)
             case "splice":
                 for (let i = change.index + change.removedCount - 1; i >= change.index; i--)
-                    const patch = {
+                    patch = {
                         op: "remove",
                         path: "" + i
                     }
