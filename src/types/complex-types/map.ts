@@ -142,11 +142,9 @@ export class MapType<S, T> extends ComplexType<{[key: string]: S}, IExtendedObse
         switch (patch.op) {
             case "add":
             case "replace":
-                console.log('replace add patch', patch)
                 target.set(subpath, patch.value)
                 break
             case "remove":
-                console.log('remov patch', subpath)
                 target.delete(subpath)
                 break
         }
